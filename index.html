@@ -1,0 +1,59 @@
+<html>
+
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+          "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+        }
+      }
+    </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="src/favicon.ico">
+</head>
+
+<body>
+  <!-- Ocultar la UI Original -->
+  <div id="loading-ui" class="custom-loading-ui hidden"></div>
+  <div id="scanning-ui" class="custom-scanning-ui hidden"></div>
+  <!-- Canva -->
+  <div id="container">
+    <!-- Pantalla de carga -->
+    <div class="loading-screen" id="loadingScreen">
+      <div class="loading-spinner"></div>
+      <div class="loading-text" id="loadingText">Descubre la historia de la Venus de Capua</div>
+      <div class="loading-subtext" id="loadingSubtext">Cargando...</div>
+    </div>
+
+    <!-- Overlay negro -->
+    <div id="info-overlay" class="hidden"></div>
+
+    <!-- Escaneo -->
+    <div class="scanning-screen" id="scanningScreen">
+      <div class="scanning-frame">
+        <div class="scanning-corners corner-tl"></div>
+        <div class="scanning-corners corner-tr"></div>
+        <div class="scanning-corners corner-bl"></div>
+        <div class="scanning-corners corner-br"></div>
+        <div class="scanning-line"></div>
+      </div>
+      <div class="scanning-text">Apunta hacia el target</div>
+      <div class="target-lost-message" id="targetLostMessage">¡Has perdido el target!</div>
+    </div>
+
+    <!-- Logo -->
+    <a href="https://www2.fba.unlp.edu.ar/areamuseo/" target="_blank" id="logo-link">
+      <img src="src/logo.png" alt="Logo">
+    </a>
+
+    <!-- Globo de diálogo -->
+    <div id="speech-bubble" class="hidden"></div>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+
+</html>
