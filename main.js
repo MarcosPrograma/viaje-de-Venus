@@ -7,34 +7,31 @@ import { SmoothTracker } from "./js/smooth-tracker.js";
 const ui = new UIControl();
 ui.startLoadingSequence();
 
-// Modelos por target: debe corresponder al orden de targets.mind
+// Modelos por target
 const MODEL_URLS = [
     "src/venus1.glb",
     "src/venus2.glb",
     "src/venus3.glb"
 ];
 
-// Config. para traqueo
 const OPCIONES_TRACKEO = {
     filterMinCF: 0.0005,
     filterBeta: 15,
-    warmupTolerance: 5, // Reducido para detección más rápida
-    missTolerance: 3, // Reducido para mejor respuesta
+    warmupTolerance: 5,
+    missTolerance: 3,
     showStats: false,
     uiLoading: false,
     uiScanning: false,
-
-    // IMPORTANTE: maxTrack controla cuántos targets pueden estar activos simultáneamente
-    maxTrack: 3, // Debe ser >= al número de targets que quieres trackear a la vez
+    maxTrack: 3,
 };
 
 const dialogues = [
-  "Florencia, 1727. En mármol y silencio nació la Venus de Capua. Su calco, viajero sin pasaporte, cruzó mares invisibles hasta América. Pero algo se quebró: su brazo, fragmentado por el tiempo, quedó atrás. La belleza llegó incompleta.",
-  "Un pequeño barco se deslizó por el océano, como un susurro entre olas. La travesía fue breve, pero profunda. Al final del viaje, la Venus encontró tierra en La Plata, donde el arte esperaba en silencio.",
-  "Frente a los ojos, la Venus se alzó de nuevo. Cubierta de polvo, su cuerpo de terracota parecía suspirar por lo perdido. Hasta que manos de artistas, diseñadores y soñadores, con tecnología y ternura, le devolvieron el brazo que el tiempo le había robado."
+    "Florencia, 1727. En mármol y silencio nació la Venus de Capua. Su calco, viajero sin pasaporte, cruzó mares invisibles hasta América. Pero algo se quebró: su brazo, fragmentado por el tiempo, quedó atrás. La belleza llegó incompleta.",
+    "Un pequeño barco se deslizó por el océano, como un susurro entre olas. La travesía fue breve, pero profunda. Al final del viaje, la Venus encontró tierra en La Plata, donde el arte esperaba en silencio.",
+    "Frente a los ojos, la Venus se alzó de nuevo. Cubierta de polvo, su cuerpo de terracota parecía suspirar por lo perdido. Hasta que manos de artistas, diseñadores y soñadores, con tecnología y ternura, le devolvieron el brazo que el tiempo le había robado."
 ];
 
-// ---------------- Iniciar mindAR ----------------------------------------------
+// Iniciar MindAR
 const mindarThree = new MindARThree({
     container: document.querySelector("#container"),
     imageTargetSrc: "src/targets.mind",
@@ -42,27 +39,24 @@ const mindarThree = new MindARThree({
 });
 const { renderer, scene, camera } = mindarThree;
 
-// Configuración del renderer para múltiples objetos
 renderer.sortObjects = true;
 renderer.setPixelRatio(window.devicePixelRatio);
 
-// Iluminación 
+// Iluminación
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
 scene.add(ambientLight);
 const hemisphereLight = new THREE.HemisphereLight(0xf5f5f5, 0x666666, 0.4);
 scene.add(hemisphereLight);
 const keyLight = new THREE.DirectionalLight(0xfff8e7, 1.2);
 keyLight.position.set(3, 8, 5);
-keyLight.castShadow = false;
 scene.add(keyLight);
 const fillLight = new THREE.DirectionalLight(0xe0e0e0, 0.3);
 fillLight.position.set(-4, 3, 6);
 scene.add(fillLight);
 
-// Cargar modelo GLTF
 const loader = new GLTFLoader();
 
-// Arreglos para gestionar múltiples targets
+// Arrays de gestión
 const anchors = [];
 const modelGroups = [];
 const mixers = [];
@@ -70,41 +64,175 @@ const trackers = [];
 const actionsList = [];
 const visibleState = [];
 const modelsLoaded = [];
-const activeTargets = new Set(); // Tracking de targets activos
+const modelActivated = []; // Nuevo: marca si el modelo ya fue activado manualmente
+const activeTargets = new Set();
 const speechBubble = document.getElementById("speech-bubble");
+
+let unlockedIndex = 0; // Control secuencial
+const markers = document.querySelectorAll(".marker");
+
+// Función para mostrar marcador
+function showMarker(index, position2D) {
+    const marker = markers[index];
+    if (!marker) return;
+
+    marker.style.left = `${position2D.x}px`;
+    marker.style.top = `${position2D.y}px`;
+    marker.style.pointerEvents = 'auto';
+    marker.style.zIndex = '100000';
+    marker.classList.add("visible");
+
+    console.log(`Marcador ${index} mostrado en (${position2D.x}, ${position2D.y})`);
+}
+
+// Función para ocultar marcador
+function hideMarker(index) {
+    const marker = markers[index];
+    if (!marker) return;
+
+    marker.style.pointerEvents = 'none';
+    marker.classList.remove("visible");
+
+    console.log(`Marcador ${index} ocultado`);
+}
+
+// Función para mostrar modelo (al hacer clic en marcador)
+function showModel(index) {
+    if (modelActivated[index]) return; // Ya fue activado
+
+    modelActivated[index] = true;
+    visibleState[index] = true;
+    activeTargets.add(index);
+
+    const group = modelGroups[index];
+    group.visible = true;
+
+    // Preparar materiales para fade-in
+    group.traverse((child) => {
+        if (child.isMesh && child.material) {
+            child.material.transparent = true;
+            child.material.opacity = 0;
+            child.material.needsUpdate = true;
+        }
+    });
+
+    // Animación de aparición
+    setTimeout(() => {
+        let opacity = 0;
+        const fadeIn = setInterval(() => {
+            opacity += 0.3;
+            group.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    child.material.opacity = Math.min(opacity, 1);
+                }
+            });
+            group.scale.multiplyScalar(1.02);
+
+            if (opacity >= 1) {
+                clearInterval(fadeIn);
+                // Asegurar opacidad final
+                group.traverse((child) => {
+                    if (child.isMesh && child.material) {
+                        child.material.opacity = 1;
+                        child.material.transparent = false;
+                        child.material.needsUpdate = true;
+                    }
+                });
+
+                const actions = actionsList[index];
+                if (actions && actions.length > 0) {
+                    actions.forEach(a => {
+                        a.reset();
+                        a.play();
+                    });
+                }
+            }
+        }, 40);
+    }, 800);
+
+    showSpeechBubble(index);
+    hideMarker(index);
+
+    // Desbloquear siguiente modelo
+    if (index + 1 < MODEL_URLS.length) {
+        unlockedIndex = index + 1;
+        console.log(`Modelo ${index + 1} desbloqueado`);
+    }
+}
+
+// Event listeners para marcadores con mejor detección
+markers.forEach((marker, i) => {
+    // Asegurar que el marcador tenga pointer-events
+    marker.style.pointerEvents = 'auto';
+    marker.style.cursor = 'pointer';
+    marker.style.zIndex = '9999';
+
+    // Múltiples eventos para mejor compatibilidad
+    const handleActivation = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        console.log(`Click en marcador ${i}, desbloqueado: ${i <= unlockedIndex}, cargado: ${modelsLoaded[i]}, activado: ${modelActivated[i]}`);
+
+        if (i <= unlockedIndex && modelsLoaded[i] && !modelActivated[i]) {
+            console.log(`✓ Activando modelo ${i}`);
+            showModel(i);
+        } else {
+            console.log(`✗ No se puede activar modelo ${i}`);
+        }
+    };
+
+    marker.addEventListener("click", handleActivation);
+    marker.addEventListener("touchend", handleActivation);
+    marker.addEventListener("pointerdown", handleActivation);
+});
 
 const targetCount = MODEL_URLS.length;
 
+let speechTimeout = null;
+
 function showSpeechBubble(index) {
-  speechBubble.textContent = dialogues[index];
-  speechBubble.classList.remove("hidden");
-  setTimeout(() => {
-    speechBubble.classList.add("visible");
-  }, 10);
+    const bubble = speechBubble;
+    if (!bubble) return;
+
+    // Cancelar cualquier diálogo previo
+    clearTimeout(speechTimeout);
+
+    // Mostrar nuevo texto
+    bubble.textContent = dialogues[index];
+    bubble.classList.remove("hidden");
+    setTimeout(() => bubble.classList.add("visible"), 10);
+
+    // Ocultar automáticamente después de 15 segundos
+    speechTimeout = setTimeout(() => {
+        hideSpeechBubble();
+    }, 15000);
 }
 
 function hideSpeechBubble() {
-  speechBubble.classList.remove("visible");
-  setTimeout(() => {
-    speechBubble.classList.add("hidden");
-  }, 500);
+    const bubble = speechBubble;
+    if (!bubble) return;
+
+    bubble.classList.remove("visible");
+    clearTimeout(speechTimeout); // evitar superposición de timers
+
+    setTimeout(() => {
+        bubble.classList.add("hidden");
+    }, 500);
 }
 
-// Crear anchors y configurar cada target
+// Crear anchors y cargar modelos
 for (let i = 0; i < targetCount; i++) {
     const anchor = mindarThree.addAnchor(i);
     anchors.push(anchor);
 
-    // Crear contenedor para el modelo
     const group = new THREE.Group();
     group.name = `model-group-${i}`;
     modelGroups.push(group);
     group.visible = false;
 
-    // agregar el grupo al anchor
     anchor.group.add(group);
 
-    // Crear un SmoothTracker para cada modelo 
     const st = new SmoothTracker();
     st.setSensitivity('medium');
     trackers.push(st);
@@ -113,6 +241,7 @@ for (let i = 0; i < targetCount; i++) {
     actionsList.push([]);
     visibleState.push(false);
     modelsLoaded.push(false);
+    modelActivated.push(false); // Inicialmente no activado
 
     const modelUrl = MODEL_URLS[i];
 
@@ -123,27 +252,23 @@ for (let i = 0; i < targetCount; i++) {
             const model = gltf.scene;
             model.name = `venus-${i}`;
 
-            // Centrar modelo
+            // Centrar
             const box = new THREE.Box3().setFromObject(model);
             const center = box.getCenter(new THREE.Vector3());
             model.position.sub(center);
 
-            // Escala y rotación
             model.scale.set(1, 1, 1);
             model.rotation.set(Math.PI / 2, 0, 0);
             model.position.set(0, 0, 0);
 
-            // Optimizaciones de renderizado para múltiples objetos
             model.traverse((child) => {
                 if (child.isMesh) {
                     child.frustumCulled = false;
                     if (child.material) {
-                        // Clonar material para evitar conflictos entre modelos
                         child.material = child.material.clone();
                         child.material.depthTest = true;
                         child.material.depthWrite = true;
                         child.material.needsUpdate = true;
-                        // Render order para evitar conflictos
                         child.renderOrder = i;
                     }
                 }
@@ -151,8 +276,9 @@ for (let i = 0; i < targetCount; i++) {
 
             group.add(model);
             modelsLoaded[i] = true;
+            console.log(`Modelo ${i} cargado`);
 
-            // Configurar animaciones si existen
+            // Configurar animaciones
             if (gltf.animations && gltf.animations.length > 0) {
                 const mixer = new THREE.AnimationMixer(model);
                 mixers[i] = mixer;
@@ -166,7 +292,6 @@ for (let i = 0; i < targetCount; i++) {
                 actionsList[i] = actions;
             }
 
-            // Inicializar posición del tracker
             st.lastPosition.copy(group.position);
             st.lastRotation.copy(group.rotation);
             st.lastScale.copy(group.scale);
@@ -179,73 +304,67 @@ for (let i = 0; i < targetCount; i++) {
         }
     );
 
-// Evento: Target encontrado
-anchor.onTargetFound = () => {
-    if (!modelsLoaded[i]) return;
+    // Target encontrado: solo mostrar marcador si no está activado
+    anchor.onTargetFound = () => {
+        if (!modelsLoaded[i]) return;
 
-    activeTargets.add(i);
-    visibleState[i] = true;
+        visibleState[i] = true;
+        activeTargets.add(i);
 
-    const group = modelGroups[i];
-    group.visible = true;
+        // Ocultar UIs
+        document.querySelector("#loading-ui")?.classList.add("hidden");
+        document.querySelector("#scanning-ui")?.classList.add("hidden");
+        document.getElementById("targetLostMessage")?.classList.add("hidden");
 
-    // Asegurar que el modelo sea opaco
-    group.traverse((child) => {
-        if (child.isMesh && child.material) {
-            child.material.opacity = 1;
-            child.material.transparent = false;
+        // Solo mostrar marcador si el modelo no ha sido activado y está desbloqueado
+        if (!modelActivated[i] && i <= unlockedIndex) {
+            const position = new THREE.Vector3();
+            anchors[i].group.getWorldPosition(position);
+            const screenPos = position.clone().project(camera);
+            const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+
+            showMarker(i, { x, y });
+        } else if (modelActivated[i]) {
+            // Si ya fue activado, mostrar el modelo directamente
+            modelGroups[i].visible = true;
         }
-    });
 
-    trackers[i].onTargetFound();
+        trackers[i].onTargetFound();
+        updateScanningUI();
+        ui.onTargetFound();
+    };
 
-    // Reproducir animaciones si las hay
-    const actions = actionsList[i];
-    if (actions && actions.length > 0) {
-        actions.forEach(a => {
-            a.reset();
-            a.play();
-        });
-    }
+    // Target perdido
+    anchor.onTargetLost = () => {
+        visibleState[i] = false;
 
-    // Ocultar interfaces y mensajes
-    document.querySelector("#loading-ui")?.classList.add("hidden");
-    document.querySelector("#scanning-ui")?.classList.add("hidden");
-    document.getElementById("targetLostMessage")?.classList.add("hidden");
+        setTimeout(() => {
+            if (!visibleState[i]) {
+                activeTargets.delete(i);
 
-    showSpeechBubble(i);
-    updateScanningUI();
-    ui.onTargetFound();
-};
+                // Solo ocultar si fue activado
+                if (modelActivated[i]) {
+                    modelGroups[i].visible = false;
+                }
 
+                updateScanningUI();
+                hideMarker(i);
 
-// Evento: Target perdido
-anchor.onTargetLost = () => {
-    visibleState[i] = false;
-
-    // Espera breve antes de considerar la pérdida total
-    setTimeout(() => {
-        if (!visibleState[i]) {
-            activeTargets.delete(i);
-            modelGroups[i].visible = false;
-            updateScanningUI();
-
-            // Mostrar mensaje y volver al modo escaneo
-            const scanningUI = document.querySelector("#scanning-ui");
-            const targetLostMessage = document.getElementById("targetLostMessage");
-
-            scanningUI?.classList.remove("hidden");
-            targetLostMessage?.classList.remove("hidden");
-
-            ui.onTargetLost();
-            // Reinicia la animación o efecto de escaneo visual si tenés uno
-            ui.onTargetLost();
-        }
-    }, 800);
-};
+                // Solo mostrar mensaje si no hay targets activos
+                if (activeTargets.size === 0) {
+                    const scanningUI = document.querySelector("#scanning-ui");
+                    const targetLostMessage = document.getElementById("targetLostMessage");
+                    scanningUI?.classList.remove("hidden");
+                    targetLostMessage?.classList.remove("hidden");
+                    ui.onTargetLost();
+                    //hideSpeechBubble();
+                }
+            }
+        }, 800);
+    };
 }
 
-// Actualizar UI de escaneo según targets visibles
 function updateScanningUI() {
     const anyVisible = activeTargets.size > 0;
     const scanningScreen = document.getElementById('scanningScreen');
@@ -260,68 +379,61 @@ function updateScanningUI() {
     }
 }
 
-// Ajustes para móviles
+// Ajustes móviles
 if (/Mobi|Android/i.test(navigator.userAgent)) {
     trackers.forEach(t => {
         t.setSensitivity('low');
         t.bufferSize = 6;
         t.predictionStrength = 0.03;
     });
-
-    // Reducir calidad de renderer en móviles
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 }
 
-// Debug: Mostrar estado cada 3 segundos
-setInterval(() => {
-    if (activeTargets.size > 0) {
-        console.log(`Estado: ${activeTargets.size} target(s) activo(s) - IDs: [${Array.from(activeTargets).join(', ')}]`);
-    }
-}, 3000);
-
-// ----------------- Renderizado -----------------
+// Iniciar
 const start = async () => {
     try {
         await mindarThree.start();
-
         ui.onARReady();
 
         const clock = new THREE.Clock();
-        let frameCount = 0;
 
         renderer.setAnimationLoop(() => {
             const delta = clock.getDelta();
-            frameCount++;
 
-            // Actualizar todas las animaciones activas
+            // Actualizar posición de marcadores para targets detectados pero no activados
+            for (let i = 0; i < anchors.length; i++) {
+                if (visibleState[i] && !modelActivated[i] && i <= unlockedIndex) {
+                    const position = new THREE.Vector3();
+                    anchors[i].group.getWorldPosition(position);
+                    const screenPos = position.clone().project(camera);
+                    const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+                    const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+                    showMarker(i, { x, y });
+                }
+            }
+
+            // Actualizar animaciones
             for (let i = 0; i < mixers.length; i++) {
-                if (mixers[i] && visibleState[i]) {
+                if (mixers[i] && visibleState[i] && modelActivated[i]) {
                     mixers[i].update(delta);
                 }
             }
 
-            // Actualizar trackers para modelos visibles
+            // Actualizar trackers
             for (let i = 0; i < modelGroups.length; i++) {
                 const group = modelGroups[i];
-                if (!group || !visibleState[i]) continue;
-
-                // Aplicar suavizado de transformación
+                if (!group || !visibleState[i] || !modelActivated[i]) continue;
                 trackers[i].smoothTransform(group, anchors[i].group);
             }
 
             renderer.render(scene, camera);
-
-            // debug cada 60 frames
-            if (frameCount % 60 === 0 && activeTargets.size > 0) {
-                console.log(`Renderizando ${activeTargets.size} modelo(s)`);
-            }
         });
 
     } catch (err) {
+        console.error("Error al iniciar:", err);
         document.getElementById('loadingSubtext').textContent =
             "Error al cargar. Verifica la cámara y recarga.";
     }
 };
 
-// Iniciar aplicación
 start();
