@@ -479,7 +479,7 @@ const start = async () => {
         await mindarThree.start();
         ui.onARReady();
 
-        if (!bgSound.isPlaying) bgSound.play();
+        //if (!bgSound.isPlaying) bgSound.play();
 
         const clock = new THREE.Clock();
 
@@ -521,5 +521,6 @@ const start = async () => {
             "Error al cargar. Verifica la cámara y recarga.";
     }
 };
+
 
 start();
