@@ -26,7 +26,7 @@ const OPCIONES_TRACKEO = {
 };
 
 const dialogues = [
-    "Florencia, 1727. En mármol y silencio nació la Venus de Capua. Su calco, viajero sin pasaporte, cruzó mares invisibles hasta América. Pero algo se quebró: su brazo, fragmentado por el tiempo, quedó atrás. La belleza llegó incompleta.",
+    "Florencia, entre 1900 y 1920. En terracota y silencio nació la Venus de Capua. Su calco, viajero sin pasaporte, cruzó mares invisibles hasta América. Pero algo se quebró: su brazo, fragmentado por el tiempo, quedó atrás. La belleza llegó incompleta.",
     "Un pequeño barco se deslizó por el océano, como un susurro entre olas. La travesía fue breve, pero profunda. Al final del viaje, la Venus encontró tierra en La Plata, donde el arte esperaba en silencio.",
     "Frente a los ojos, la Venus se alzó de nuevo. Cubierta de polvo, su cuerpo de terracota parecía suspirar por lo perdido. Hasta que manos de artistas, diseñadores y soñadores, con tecnología y ternura, le devolvieron el brazo que el tiempo le había robado."
 ];
@@ -55,6 +55,32 @@ fillLight.position.set(-4, 3, 6);
 scene.add(fillLight);
 
 const loader = new GLTFLoader();
+
+const listener = new THREE.AudioListener();
+camera.add(listener);
+
+// Audio ambiental
+const bgSound = new THREE.Audio(listener);
+const audioLoader = new THREE.AudioLoader();
+
+audioLoader.load("src/audio/ambient.mp3", (buffer) => {
+    bgSound.setBuffer(buffer);
+    bgSound.setLoop(true);
+    bgSound.setVolume(0.4);
+});
+
+// Foley por modelo
+const foleySounds = [];
+
+for (let i = 0; i < MODEL_URLS.length; i++) {
+    const sound = new THREE.Audio(listener);
+    audioLoader.load(`src/audio/foley${i + 1}.mp3`, (buffer) => {
+        sound.setBuffer(buffer);
+        sound.setLoop(false);
+        sound.setVolume(0.9);
+    });
+    foleySounds.push(sound);
+}
 
 // Arrays de gestión
 const anchors = [];
@@ -96,9 +122,51 @@ function hideMarker(index) {
     console.log(`Marcador ${index} ocultado`);
 }
 
+//Si existe un modelo anterior activado, fade-in y activar nuevo modelo
+function fadeOutModel(index) {
+    const group = modelGroups[index];
+    if (!group) return;
+
+    let opacity = 1;
+    group.traverse((child) => {
+        if (child.isMesh) {
+            child.material.transparent = true;
+        }
+    });
+
+    const fadeOut = setInterval(() => {
+        opacity -= 0.05;
+        group.traverse((child) => {
+            if (child.isMesh && child.material) {
+                child.material.opacity = Math.max(opacity, 0);
+            }
+        });
+
+        if (opacity <= 0) {
+            clearInterval(fadeOut);
+            group.visible = false;
+            group.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    child.material.opacity = 0;
+                }
+            });
+        }
+    }, 40); // velocidad del fade
+}
+
 // Función para mostrar modelo (al hacer clic en marcador)
 function showModel(index) {
     if (modelActivated[index]) return; // Ya fue activado
+
+    if (index > 0) {
+        const previousIndex = index - 1;
+        if (modelActivated[previousIndex]) {
+            console.log("Ocultando modelo anterior", previousIndex);
+            setTimeout(() => {
+                fadeOutModel(previousIndex);
+            }, 4000); // tiempo de espera antes de ocultar
+        }
+    }
 
     modelActivated[index] = true;
     visibleState[index] = true;
@@ -145,6 +213,10 @@ function showModel(index) {
                         a.reset();
                         a.play();
                     });
+                }
+
+                if (foleySounds[index] && !foleySounds[index].isPlaying) {
+                    foleySounds[index].play();
                 }
             }
         }, 40);
@@ -394,6 +466,8 @@ const start = async () => {
     try {
         await mindarThree.start();
         ui.onARReady();
+
+        if (!bgSound.isPlaying) bgSound.play();
 
         const clock = new THREE.Clock();
 
