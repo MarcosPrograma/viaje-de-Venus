@@ -461,6 +461,18 @@ if (/Mobi|Android/i.test(navigator.userAgent)) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 }
 
+function enableAudio() {
+  if (!bgSound.isPlaying) {
+    bgSound.play();
+  }
+  document.removeEventListener('touchstart', enableAudio);
+  document.removeEventListener('click', enableAudio);
+}
+
+// Se activa cuando el usuario toca la pantalla
+document.addEventListener('touchstart', enableAudio);
+document.addEventListener('click', enableAudio);
+
 // Iniciar
 const start = async () => {
     try {
