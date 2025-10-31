@@ -461,6 +461,7 @@ if (/Mobi|Android/i.test(navigator.userAgent)) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 }
 
+/*
 function enableAudio() {
   if (!bgSound.isPlaying) {
     bgSound.play();
@@ -472,6 +473,7 @@ function enableAudio() {
 // Se activa cuando el usuario toca la pantalla
 document.addEventListener('touchstart', enableAudio);
 document.addEventListener('click', enableAudio);
+*/
 
 // Iniciar
 const start = async () => {
@@ -479,7 +481,7 @@ const start = async () => {
         await mindarThree.start();
         ui.onARReady();
 
-        //if (!bgSound.isPlaying) bgSound.play();
+        if (!bgSound.isPlaying) bgSound.play();
 
         const clock = new THREE.Clock();
 
@@ -521,6 +523,5 @@ const start = async () => {
             "Error al cargar. Verifica la cámara y recarga.";
     }
 };
-
 
 start();
