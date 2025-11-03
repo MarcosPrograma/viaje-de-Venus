@@ -29,8 +29,7 @@ export class ModelManager {
         this.trackers = [];
 
         this.activeTargets = new Set();
-        this.unlockedIndex = 0;
-        this.currentVisibleModel = null;
+        this.currentStep = 0; // estado actual en el relato (0, 1, 2)
 
         this.setupModels();
         this.setupMarkerEvents();
@@ -61,6 +60,8 @@ export class ModelManager {
     loadModel(i) {
         this.loader.load(this.MODEL_URLS[i], (gltf) => {
             const model = gltf.scene;
+            model.rotation.x = Math.PI / 2;
+
             this.modelGroups[i].add(model);
             this.modelsLoaded[i] = true;
 
@@ -80,7 +81,8 @@ export class ModelManager {
     setupMarkerEvents() {
         document.querySelectorAll(".marker").forEach((marker, i) => {
             const activate = () => {
-                if (this.modelsLoaded[i] && !this.modelActivated[i] && i <= this.unlockedIndex) {
+                // permite activar si es el paso actual y el modelo está cargado
+                if (this.modelsLoaded[i] && i === this.currentStep) {
                     this.showModel(i);
                 }
             };
@@ -99,15 +101,14 @@ export class ModelManager {
 
             this.ui.onTargetFound();
 
-            if (!this.modelActivated[i]) {
+            // solo muestra el marcador si es el paso actual y no ha sido activado
+            if (i === this.currentStep && !this.modelActivated[i]) {
                 const position = new THREE.Vector3();
                 this.anchors[i].group.getWorldPosition(position);
                 const screenPos = position.clone().project(this.camera);
                 const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
                 const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
                 this.ui.showMarker(i, { x, y });
-            } else {
-                this.modelGroups[i].visible = true;
             }
         };
 
@@ -118,9 +119,8 @@ export class ModelManager {
                 if (!this.visibleState[i]) {
                     this.activeTargets.delete(i);
                     this.ui.hideMarker(i);
-                    if (this.modelActivated[i]) this.modelGroups[i].visible = false;
                     
-                    // Verificar si ya no hay targets activos
+                    // verificar si ya no hay targets activos
                     if (this.activeTargets.size === 0) {
                         this.ui.onTargetLost();
                     }
@@ -130,18 +130,17 @@ export class ModelManager {
     }
 
     showModel(i) {
-        // Ocultar el modelo anterior si existe
-        if (this.currentVisibleModel !== null && this.currentVisibleModel !== i) {
-            const prevGroup = this.modelGroups[this.currentVisibleModel];
+        // ocultar el modelo anterior si existe
+        if (i > 0 && this.modelActivated[i - 1]) {
+            const prevGroup = this.modelGroups[i - 1];
             this.fadeOutModel(prevGroup);
             this.ui.hideSpeechBubble();
         }
 
         this.modelActivated[i] = true;
-        this.currentVisibleModel = i;
         const group = this.modelGroups[i];
         
-        // Fade in del nuevo modelo
+        // fade in del nuevo modelo
         this.fadeInModel(group);
 
         this.ui.hideMarker(i);
@@ -152,13 +151,14 @@ export class ModelManager {
 
         this.audioManager.play(`foley${i + 1}`);
 
+        // avanzar al siguiente paso del relato
         if (i + 1 < this.MODEL_URLS.length) {
-            this.unlockedIndex = i + 1;
+            this.currentStep = i + 1;
         }
     }
 
     fadeOutModel(group) {
-        // Configurar opacidad inicial si no existe
+        // configurar opacidad inicial si no existe
         group.traverse((child) => {
             if (child.isMesh) {
                 if (!child.material.transparent) {
@@ -186,7 +186,7 @@ export class ModelManager {
                 requestAnimationFrame(animate);
             } else {
                 group.visible = false;
-                // Restaurar opacidad para cuando vuelva a aparecer
+                // restaurar opacidad para cuando vuelva a aparecer
                 group.traverse((child) => {
                     if (child.isMesh) {
                         child.material.opacity = 1;
@@ -201,7 +201,7 @@ export class ModelManager {
     fadeInModel(group) {
         group.visible = true;
         
-        // Configurar opacidad inicial
+        // configurar opacidad inicial
         group.traverse((child) => {
             if (child.isMesh) {
                 if (!child.material.transparent) {
@@ -240,9 +240,10 @@ export class ModelManager {
             }
         });
 
-        //Actualizar posiciones de marcadores en targets no activados
-        for (let i = 0; i < this.anchors.length; i++) {
-            if (this.visibleState[i] && !this.modelActivated[i] && i <= this.unlockedIndex) {
+        // Actualizar posiciones de marcadores - solo para el paso actual
+        if (this.currentStep < this.anchors.length) {
+            const i = this.currentStep;
+            if (this.visibleState[i] && !this.modelActivated[i]) {
                 const position = new THREE.Vector3();
                 this.anchors[i].group.getWorldPosition(position);
                 const screenPos = position.clone().project(this.camera);
