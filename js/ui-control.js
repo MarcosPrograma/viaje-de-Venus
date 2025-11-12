@@ -42,14 +42,16 @@ export class UIControl {
 
         clearTimeout(this.speechTimeout);
 
+        bubble.classList.remove("hidden", "visible");
         bubble.textContent = this.dialogues[index];
-        bubble.classList.remove("hidden");
 
-        setTimeout(() => bubble.classList.add("visible"), 10);
+        setTimeout(() => {
+            bubble.classList.add("visible");
+        }, 20); //delay
 
         this.speechTimeout = setTimeout(() => {
             this.hideSpeechBubble();
-        }, 15000);
+        }, 100000); //30 seg
     }
 
     hideSpeechBubble() {
@@ -57,9 +59,10 @@ export class UIControl {
         if (!bubble) return;
 
         bubble.classList.remove("visible");
+
         clearTimeout(this.speechTimeout);
 
-        setTimeout(() => {
+        this.speechTimeout = setTimeout(() => {
             bubble.classList.add("hidden");
         }, 500);
     }
