@@ -6,9 +6,9 @@ import { ModelManager } from "./js/model-manager.js";
 import { setupLighting } from "./js/lighting.js";
 
 const dialogues = [
-    "Florencia, entre 1900 y 1920. En terracota y silencio nació la Venus de Capua. Su calco, viajero sin pasaporte, cruzó mares invisibles hasta América. Pero algo se quebró: su brazo, fragmentado por el tiempo, quedó atrás. La belleza llegó incompleta.",
-    "Un pequeño barco se deslizó por el océano, como un susurro entre olas. La travesía fue breve, pero profunda. Al final del viaje, la Venus encontró tierra en La Plata, donde el arte esperaba en silencio.",
-    "Frente a los ojos, la Venus se alzó de nuevo. Cubierta de polvo, su cuerpo de terracota parecía suspirar por lo perdido. Hasta que manos de artistas, diseñadores y soñadores, con tecnología y ternura, le devolvieron el brazo que el tiempo le había robado."
+    "Florencia, entre 1900 y 1920. En terracota, Manifattura di Signa dio forma a la Venus de Capua. Su calco, viajero sin pasaporte, cruzó mares invisibles hasta América.",
+    "Un pequeño barco se deslizó por el océano, como un susurro entre olas. La travesía fue breve, pero profunda. Al final del viaje, la Venus tocó tierra en La Plata, donde el arte la aguardaba en silencio.",
+    "Frente a los ojos, la Venus se alzó de nuevo. Pero algo se había quebrado: su brazo, fragmentado por el tiempo, había quedado atrás. Cubierta de polvo, su cuerpo de terracota parecía suspirar por lo perdido. Hasta que manos de artistas, diseñadores y soñadores, con tecnología y ternura, le devolvieron el brazo que el tiempo le había robado."
 ];
 const ui = new UIControl(dialogues);
 ui.startLoadingSequence();
