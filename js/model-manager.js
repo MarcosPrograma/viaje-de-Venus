@@ -99,7 +99,7 @@ export class ModelManager {
             this.visibleState[i] = true;
             this.activeTargets.add(i);
 
-            this.ui.onTargetFound();
+            this.ui.onTargetFound(i);
 
             // solo muestra el marcador si es el paso actual y no ha sido activado
             if (i === this.currentStep && !this.modelActivated[i]) {
@@ -122,7 +122,7 @@ export class ModelManager {
                     
                     // verificar si ya no hay targets activos
                     if (this.activeTargets.size === 0) {
-                        this.ui.onTargetLost();
+                        this.ui.onTargetLost(i);
                     }
                 }
             }, 800);
@@ -144,7 +144,7 @@ export class ModelManager {
         this.fadeInModel(group);
 
         this.ui.hideMarker(i);
-        this.ui.showSpeechBubble(i);
+        this.ui.showSpeechBubble(i, i);
 
         const actions = this.actionsList[i];
         actions?.forEach(a => a.play());
